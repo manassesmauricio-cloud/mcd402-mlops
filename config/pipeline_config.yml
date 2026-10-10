@@ -1,0 +1,28 @@
+airflow:
+  cron_schedule: "0 */2 * * *"   # cada 2 horas (min hr dom mes dow)
+  dag_owner: "mlops-urp"
+  retries: 1
+  retry_delay_minutes: 5
+
+mlflow:
+  tracking_uri: "sqlite:///mlflow/mlflow.db"
+  artifact_root: "mlflow/artifacts"
+  experiment_name: "AutoML_Pipeline"
+  tags:
+    equipo: "mlops-urp"
+    framework: "SDLF v2.0"
+    caso_uso: "clasificacion_binaria"
+
+training:
+  n_iter_hpo: 15
+  cv_folds: 3
+  n_jobs: -1           # -1 = todos los cores disponibles
+  test_size: 0.2
+  random_state: 42
+  decay_threshold: 10.0
+  use_gpu: auto        # auto | true | false
+
+data:
+  train_path: "data/processed/train.csv"
+  test_path: "data/processed/test.csv"
+  models_dir: "models"
