@@ -58,7 +58,7 @@ def log_run(result, par_meta, X_test, y_test, extra_tags=None):
         plt.close(fig)
         mlflow.log_artifact(fig_path, artifact_path="graficos")
 
-        mlflow.sklearn.log_model(result["model"], name="modelo")
+        mlflow.sklearn.log_model(result["model"], name="modelo", serialization_format="cloudpickle")
 
         run_id = run.info.run_id
         print(f"  [{result['name']}]  auc_test={result['auc_test']}  run_id={run_id[:8]}")

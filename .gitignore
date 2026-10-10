@@ -1,4 +1,7 @@
 __pycache__/
+.venv/
+catboost_info/
+mlruns/
 *.pyc
 .env
 *.pkl

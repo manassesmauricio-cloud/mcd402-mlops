@@ -2,14 +2,14 @@
 
 **MCD-402 · 2026-2**
 
-Pipeline completo de Machine Learning con gestión de experimentos (MLflow), entrenamiento paralelo con soporte GPU, y orquestación programada con Apache Airflow — sin Docker.
+Pipeline completo de Machine Learning con gestión de experimentos (MLflow), entrenamiento paralelo con soporte GPU, y orquestación programada con Apache Airflow. En Linux/macOS (o WSL2) corre sin Docker; en Windows nativo se ejecuta dentro de un contenedor (ver [Ejecución en Windows con Docker](#ejecución-en-windows-con-docker)).
 
 ---
 
 ## Estructura del proyecto
 
 ```
-mlops-airflow/
+mcd402-mlops/
 ├── config/
 │   └── pipeline_config.yml   ← parámetros del pipeline y cron de Airflow
 ├── dags/
@@ -21,10 +21,12 @@ mlops-airflow/
 ├── notebooks/
 │   └── mlflow_experimentos.ipynb  ← notebook principal de la sesión
 ├── data/
-│   ├── raw/                  ← colocar los CSV de entrada aquí
+│   ├── raw/                  ← colocar los CSV de entrada aquí (incluye .gitkeep)
 │   └── processed/            ← se genera automáticamente
-├── models/                   ← modelos entrenados (organizados por timestamp)
-├── mlflow/                   ← base de datos SQLite de experimentos
+├── models/                   ← modelos de save_model() (el DAG actual no lo usa)
+├── mlflow/                   ← base de datos SQLite de experimentos (se genera)
+├── mlruns/                   ← artefactos de MLflow: modelos, curvas ROC (se genera)
+├── Dockerfile                ← entorno Linux para ejecutar en Windows
 ├── Makefile                  ← comandos de un solo paso
 └── requirements.txt
 ```
@@ -33,8 +35,9 @@ mlops-airflow/
 
 ## Requisitos
 
-- Python 3.10 o superior
+- Python 3.10 – 3.12 (Airflow 2.x no soporta versiones más nuevas)
 - Sistema operativo: Linux, macOS o Windows con WSL2 recomendado para Airflow
+- Windows sin WSL2: Docker Desktop (ver sección más abajo)
 
 ---
 
@@ -71,7 +74,7 @@ Las dependencias principales son:
 
 | Librería | Versión mínima | Propósito |
 |---|---|---|
-| `mlflow` | 2.12 | Gestión de experimentos |
+| `mlflow` | 3.0 | Gestión de experimentos |
 | `apache-airflow` | 2.9 | Orquestación de pipelines |
 | `scikit-learn` | 1.4 | Modelos base y métricas |
 | `xgboost` | 2.0 | Gradient boosting con soporte GPU |
@@ -92,8 +95,11 @@ Las dependencias principales son:
 La forma más directa de explorar el proyecto es el notebook:
 
 ```bash
+pip install notebook   # Jupyter no está en requirements.txt
 jupyter notebook notebooks/mlflow_experimentos.ipynb
 ```
+
+En Windows con Docker, ver el comando de notebook en [Ejecución en Windows con Docker](#ejecución-en-windows-con-docker).
 
 El notebook guía el flujo completo:
 1. Cargar o generar datos
@@ -133,6 +139,8 @@ training:
 
 ## Iniciar Airflow (sin Docker)
 
+> Los comandos `make` requieren Linux, macOS o WSL2 (usan `make` y sintaxis bash).
+
 ```bash
 # Solo la primera vez — inicializa la base de datos
 make airflow-init
@@ -159,6 +167,34 @@ make mlflow-ui
 ```
 
 Luego abrir `http://localhost:5000` para ver y comparar todos los experimentos.
+
+---
+
+## Ejecución en Windows con Docker
+
+Airflow no corre nativo en Windows y, si **Smart App Control** está activo, Windows bloquea las DLLs
+de los paquetes instalados con pip (`DLL load failed ... Control de aplicaciones bloqueó este archivo`).
+En ese caso se usa el `Dockerfile` del repo como entorno Linux; el código se monta como volumen.
+
+```powershell
+# Construir la imagen (una sola vez, o al cambiar requirements.txt)
+docker build -t mcd402-mlops .
+
+# Ejecutar el DAG completo una vez (equivale a make airflow-init + make dag-test)
+docker run --rm -v "${PWD}:/app" mcd402-mlops bash -c "airflow db migrate && airflow dags test automl_training_pipeline"
+
+# UI de MLflow → http://localhost:5000
+docker run --rm -p 5000:5000 -v "${PWD}:/app" mcd402-mlops mlflow ui --backend-store-uri sqlite:///mlflow/mlflow.db --host 0.0.0.0 --port 5000
+
+# Notebook → abrir la URL con token que imprime la consola
+docker run --rm -p 8888:8888 -v "${PWD}:/app" mcd402-mlops jupyter notebook --ip 0.0.0.0 --allow-root --no-browser
+```
+
+El DAG completo tarda ~12 minutos en CPU con la configuración por defecto
+(3 modelos × 15 iteraciones × 3 folds, entrenados dos veces para medir el speedup secuencial vs. paralelo).
+
+> **Nota sobre MLflow 3.x:** desde MLflow 3 los modelos sklearn se serializan con `skops` por defecto,
+> que rechaza XGBoost. Por eso `src/registry.py` usa `serialization_format="cloudpickle"` en `log_model`.
 
 ---
 
