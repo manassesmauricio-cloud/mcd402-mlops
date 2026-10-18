@@ -190,6 +190,9 @@ docker run --rm -p 5000:5000 -v "${PWD}:/app" mcd402-mlops mlflow ui --backend-s
 docker run --rm -p 8888:8888 -v "${PWD}:/app" mcd402-mlops jupyter notebook --ip 0.0.0.0 --allow-root --no-browser
 ```
 
+> **Puerto ocupado:** si Docker responde `port is already allocated`, otro programa usa ese puerto.
+> Cambiar solo el lado izquierdo del mapeo, por ejemplo `-p 5001:5000`, y abrir `http://localhost:5001`.
+
 El DAG completo tarda ~12 minutos en CPU con la configuración por defecto
 (3 modelos × 15 iteraciones × 3 folds, entrenados dos veces para medir el speedup secuencial vs. paralelo).
 
